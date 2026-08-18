@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
 use ndarray::{Array2, ArrayView2};
 use ndarray_rand::rand::Rng;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 #[cfg_attr(
     feature = "serde",
@@ -58,7 +58,7 @@ impl<T: crate::k_modes::EquivalenceTarget> KModesInit<T> {
     }
 }
 
-/// Cao initialization (Cao et al. [2009]): Density and dissimilarity-based initialization.
+/// Cao initialization (Cao et al. [2009])
 pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     x: ArrayView2<T>,
     n_clusters: usize,
@@ -85,7 +85,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     }
 
     let mut selected_indices = Vec::with_capacity(n_clusters);
-    // Centroid 0: point with highest density
+    // Centroid 0 is point with highest density
     let first_idx = dens
         .iter()
         .enumerate()
@@ -94,7 +94,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
         .unwrap_or(0);
     selected_indices.push(first_idx);
 
-    // Remaining centroids: max of (min distance * density) to existing centroids
+    // Remaining centroids are selected by the max of (min distance * density) to existing centroids
     for _ in 1..n_clusters {
         let mut best_idx = 0;
         let mut best_score = -1.0f64;
@@ -109,11 +109,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
 
             for &c_idx in &selected_indices {
                 let c_row = x.row(c_idx);
-                let dist = row
-                    .iter()
-                    .zip(c_row.iter())
-                    .filter(|(a, b)| a != b)
-                    .count() as f64;
+                let dist = row.iter().zip(c_row.iter()).filter(|(a, b)| a != b).count() as f64;
                 let score = dist * dens[ipoint];
                 if score < min_d {
                     min_d = score;
@@ -133,7 +129,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     })
 }
 
-/// Huang initialization (Huang [1997, 1998]): Attribute frequency sampling.
+/// Huang initialization (Huang [1997, 1998])
 pub(crate) fn init_huang<T: crate::k_modes::EquivalenceTarget, R: Rng>(
     x: ArrayView2<T>,
     n_clusters: usize,
@@ -185,7 +181,7 @@ pub(crate) fn init_huang<T: crate::k_modes::EquivalenceTarget, R: Rng>(
     tentative
 }
 
-/// Random initialization: selects `n_clusters` random unique data points as centroids.
+/// Random initialization by selecting `n_clusters` random unique data points as centroids.
 pub(crate) fn random_init<T: Clone, R: Rng>(
     x: ArrayView2<T>,
     n_clusters: usize,

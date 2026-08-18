@@ -24,6 +24,8 @@ pub struct KModesValidParams<T, R: Rng> {
     pub(crate) n_runs: usize,
     /// Centroid initialization methods
     pub(crate) init: KModesInit<T>,
+    /// Enable verbose progress logging to stdout.
+    pub(crate) verbose: bool,
     /// Random number generator.
     pub(crate) rng: R,
 }
@@ -43,6 +45,10 @@ impl<T, R: Rng> KModesValidParams<T, R> {
 
     pub fn init_method(&self) -> &KModesInit<T> {
         &self.init
+    }
+
+    pub fn verbose(&self) -> bool {
+        self.verbose
     }
 
     pub fn rng(&self) -> &R {
@@ -65,6 +71,7 @@ impl<T> KModesParams<T, Xoshiro256Plus> {
     ///  * max_n_iterations: 100
     ///  * n_runs: 10
     ///  * init: KModesInit::Cao
+    ///  * verbose: false
     pub fn new(n_clusters: usize) -> Self {
         Self::new_with_rng(n_clusters, Xoshiro256Plus::seed_from_u64(42))
     }
@@ -76,12 +83,14 @@ impl<T, R: Rng> KModesParams<T, R> {
     ///  * max_n_iterations: 100
     ///  * n_runs: 10
     ///  * init: KModesInit::Cao
+    ///  * verbose: false
     pub fn new_with_rng(n_clusters: usize, rng: R) -> Self {
         Self(KModesValidParams {
             n_clusters,
             max_n_iterations: 100,
             n_runs: 10,
             init: KModesInit::Cao,
+            verbose: false,
             rng,
         })
     }
@@ -104,6 +113,12 @@ impl<T, R: Rng> KModesParams<T, R> {
         self
     }
 
+    /// Enable or disable verbose progress logging to stdout.
+    pub fn verbose(mut self, verbose: bool) -> Self {
+        self.0.verbose = verbose;
+        self
+    }
+
     /// Set a custom random number generator.
     pub fn with_rng<R2: Rng>(self, rng: R2) -> KModesParams<T, R2> {
         KModesParams(KModesValidParams {
@@ -111,6 +126,7 @@ impl<T, R: Rng> KModesParams<T, R> {
             max_n_iterations: self.0.max_n_iterations,
             n_runs: self.0.n_runs,
             init: self.0.init,
+            verbose: self.0.verbose,
             rng,
         })
     }

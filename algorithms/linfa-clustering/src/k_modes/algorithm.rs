@@ -56,7 +56,7 @@ impl<T: EquivalenceTarget, R: Rng + Clone, D: Data<Elem = T>, L>
         dataset: &DatasetBase<ArrayBase<D, Ix2>, L>,
     ) -> Result<Self::Object, KModesError> {
         let observations = dataset.records().view();
-        let (n_points, _n_attr) = observations.dim();
+        let (n_points, _) = observations.dim();
 
         if n_points == 0 {
             return Err(
@@ -76,25 +76,41 @@ impl<T: EquivalenceTarget, R: Rng + Clone, D: Data<Elem = T>, L>
         let mut rng = self.rng().clone();
         let mut best_cost = usize::MAX;
         let mut best_centroids = None;
+        let mut best_run = 0;
 
         let n_runs = match self.init_method() {
-            KModesInit::Cao if self.n_runs() > 1 => 1,
+            KModesInit::Cao if self.n_runs() > 1 => {
+                if self.verbose() {
+                    println!("Cao initialization is deterministic. Running 1 initialization.");
+                }
+                1
+            }
             _ => self.n_runs(),
         };
 
-        for _ in 0..n_runs {
+        for run_idx in 0..n_runs {
+            if self.verbose() && n_runs > 1 {
+                println!("Starting K-Modes run {}/{}", run_idx + 1, n_runs);
+            }
+
             let (centroids, cost) = k_modes_single(
                 observations,
                 self.n_clusters(),
                 self.max_n_iterations(),
                 self.init_method(),
                 &mut rng,
+                self.verbose(),
             );
 
             if cost < best_cost {
                 best_cost = cost;
                 best_centroids = Some(centroids);
+                best_run = run_idx;
             }
+        }
+
+        if self.verbose() && n_runs > 1 {
+            println!("Best run was number {} (cost: {})", best_run + 1, best_cost);
         }
 
         let modes = best_centroids.ok_or_else(|| {
@@ -151,6 +167,7 @@ fn k_modes_single<T: EquivalenceTarget, R: Rng>(
     max_n_iterations: u64,
     init: &KModesInit<T>,
     rng: &mut R,
+    verbose: bool,
 ) -> (Array2<T>, usize) {
     let (n_points, n_attrs) = observations.dim();
 
@@ -261,11 +278,18 @@ fn k_modes_single<T: EquivalenceTarget, R: Rng>(
         cost = ncost;
 
         if moves == 0 {
-            println!(
-                "K-Modes converged at iteration {} (moves: {}, cost: {})",
-                iter, moves, cost
-            );
+            if verbose {
+                println!(
+                    "K-Modes converged at iteration {} (moves: {}, cost: {})",
+                    iter, moves, cost
+                );
+            }
             break;
+        } else if verbose && (iter % 10 == 0 || iter == max_n_iterations) {
+            println!(
+                "Iteration {}/{}: moves = {}, cost = {}",
+                iter, max_n_iterations, moves, cost
+            );
         }
     }
 
@@ -369,6 +393,7 @@ mod tests {
         let dataset = DatasetBase::from(data);
         let model = KModes::params(2)
             .max_n_iterations(50)
+            .verbose(false)
             .fit(&dataset)
             .unwrap();
 
