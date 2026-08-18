@@ -17,27 +17,25 @@ pub struct KModes<T: EquivalenceTarget> {
     modes: Array2<T>,
 }
 
-pub trait EquivalenceTarget: PartialEq + Clone {}
-impl<T: PartialEq + Clone> EquivalenceTarget for T {}
+pub trait EquivalenceTarget: PartialEq + Eq + Clone + std::hash::Hash {}
+impl<T: PartialEq + Eq + Clone + std::hash::Hash> EquivalenceTarget for T {}
 
-impl KModes<usize> {
-    pub fn params(n_clusters: usize) -> KModesParams<Xoshiro256Plus> {
+impl<T: EquivalenceTarget> KModes<T> {
+    pub fn params(n_clusters: usize) -> KModesParams<T, Xoshiro256Plus> {
         KModesParams::new(n_clusters)
     }
 
-    pub fn params_with_rng<R: Rng>(n_clusters: usize, rng: R) -> KModesParams<R> {
+    pub fn params_with_rng<R: Rng>(n_clusters: usize, rng: R) -> KModesParams<T, R> {
         KModesParams::new_with_rng(n_clusters, rng)
     }
-}
 
-impl<T: EquivalenceTarget> KModes<T> {
     pub fn modes(&self) -> &Array2<T> {
         &self.modes
     }
 }
 
 impl<T: EquivalenceTarget, R: Rng + Clone, D: Data<Elem = T>, L>
-    Fit<ArrayBase<D, Ix2>, L, KModesError> for KModesValidParams<R>
+    Fit<ArrayBase<D, Ix2>, L, KModesError> for KModesValidParams<T, R>
 {
     type Object = KModes<T>;
 

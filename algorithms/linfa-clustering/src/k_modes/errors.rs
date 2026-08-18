@@ -6,6 +6,8 @@ pub enum KModesParamsError {
     NClusters,
     #[error("max_n_iterations cannot be 0")]
     MaxIterations,
+    #[error("n_runs cannot be 0")]
+    NRuns,
 }
 
 #[derive(Error, Debug)]
