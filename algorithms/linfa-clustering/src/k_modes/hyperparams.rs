@@ -158,6 +158,8 @@ impl<T, R: Rng> ParamGuard for KModesParams<T, R> {
 mod tests {
     use super::*;
     use linfa::ParamGuard;
+    use ndarray_rand::rand::{RngCore, SeedableRng};
+    use rand_xoshiro::Xoshiro256Plus;
 
     #[test]
     fn autotraits() {
@@ -191,12 +193,14 @@ mod tests {
             .init_method(KModesInit::Huang)
             .verbose(true);
 
+        assert!(params.check_ref().is_ok());
         let valid = params.check().unwrap();
         assert_eq!(valid.n_clusters(), 3);
         assert_eq!(valid.max_n_iterations(), 200);
         assert_eq!(valid.n_runs(), 15);
         assert_eq!(valid.init_method(), &KModesInit::Huang);
         assert!(valid.verbose());
+        let _ = valid.rng();
     }
 
     #[test]
@@ -251,6 +255,13 @@ mod tests {
         let serialized = serde_json::to_string(&valid).unwrap();
         let deserialized: KModesValidParams<String, DummyRng> =
             serde_json::from_str(&serialized).unwrap();
+
+        let mut dummy = DummyRng;
+        assert_eq!(dummy.next_u32(), 0);
+        assert_eq!(dummy.next_u64(), 0);
+        let mut buf = [0u8; 4];
+        dummy.fill_bytes(&mut buf);
+        assert!(dummy.try_fill_bytes(&mut buf).is_ok());
 
         assert_eq!(valid.n_clusters(), deserialized.n_clusters());
         assert_eq!(valid.max_n_iterations(), deserialized.max_n_iterations());

@@ -159,9 +159,7 @@ impl<T: EquivalenceTarget, R: Rng + Clone, D: Data<Elem = T>, L>
             }
         }
 
-        let modes = best_centroids.ok_or_else(|| {
-            linfa::error::Error::Parameters("Failed to fit K-Modes centroids".to_string())
-        })?;
+        let modes = best_centroids.expect("internal error: K-Modes failed to fit centroids");
 
         Ok(KModes {
             modes,
@@ -851,5 +849,109 @@ mod tests {
         assert_eq!(model, deserialized);
         assert_eq!(model.modes(), deserialized.modes());
         assert_eq!(model.cost(), deserialized.cost());
+    }
+
+    #[test]
+    fn test_kmodes_verbose_logging_coverage() {
+        let data = array![
+            ["A", "X"],
+            ["A", "X"],
+            ["B", "Y"],
+            ["B", "Y"],
+            ["C", "Z"],
+            ["C", "Z"]
+        ];
+        let dataset = DatasetBase::from(data);
+
+        // Triggers Cao deterministic warning logging
+        let m_cao = KModes::params(2)
+            .n_runs(3)
+            .verbose(true)
+            .init_method(KModesInit::Cao)
+            .fit(&dataset)
+            .unwrap();
+        assert_eq!(m_cao.modes().dim(), (2, 2));
+
+        // Triggers multi-run and convergence verbose logging
+        let m_rand = KModes::params(2)
+            .n_runs(2)
+            .max_n_iterations(20)
+            .verbose(true)
+            .init_method(KModesInit::Random)
+            .fit(&dataset)
+            .unwrap();
+        assert_eq!(m_rand.modes().dim(), (2, 2));
+
+        // Triggers max_n_iterations logging branch
+        let m_max_iter = KModes::params(2)
+            .n_runs(1)
+            .max_n_iterations(1)
+            .verbose(true)
+            .init_method(KModesInit::Random)
+            .fit(&dataset)
+            .unwrap();
+        assert_eq!(m_max_iter.modes().dim(), (2, 2));
+    }
+
+    #[test]
+    fn test_kmodes_empty_cluster_recovery() {
+        let data = array![
+            ["A", "1"],
+            ["A", "1"],
+            ["A", "1"],
+            ["A", "1"],
+            ["B", "2"],
+            ["B", "2"],
+            ["B", "2"],
+            ["B", "2"]
+        ];
+        let dataset = DatasetBase::from(data);
+
+        // Precompute centroids with duplicate points so cluster 1 becomes empty during assignment
+        let init_modes = array![["A", "1"], ["A", "1"], ["B", "2"]];
+        let model = KModes::params(3)
+            .init_method(KModesInit::Precomputed(init_modes))
+            .fit(&dataset)
+            .unwrap();
+
+        assert_eq!(model.modes().dim(), (3, 2));
+    }
+
+    #[test]
+    fn test_kmodes_default_target() {
+        use linfa::traits::PredictInplace;
+        let data = array![["A", "X"], ["B", "Y"]];
+        let dataset = DatasetBase::from(data.clone());
+        let model = KModes::params(2).fit(&dataset).unwrap();
+
+        let t2d = model.default_target(&data);
+        assert_eq!(t2d.len(), 2);
+
+        let sample = array!["A", "X"];
+        let t1d = model.default_target(&sample);
+        assert_eq!(t1d, 0);
+    }
+
+    #[test]
+    fn test_kmodes_initial_empirical_mode_update() {
+        // Points assigned to cluster 0 will have "Y" as mode, differing from initial seed "X"
+        let data = array![
+            ["Y", "1"],
+            ["Y", "1"],
+            ["Y", "1"],
+            ["X", "1"],
+            ["Z", "9"],
+            ["Z", "9"]
+        ];
+        let dataset = DatasetBase::from(data);
+
+        // Precomputed initial centroids: cluster 0 starts with ["X", "1"], cluster 1 starts with ["Z", "9"]
+        let init_modes = array![["X", "1"], ["Z", "9"]];
+        let model = KModes::params(2)
+            .init_method(KModesInit::Precomputed(init_modes))
+            .fit(&dataset)
+            .unwrap();
+
+        assert_eq!(model.modes()[[0, 0]], "Y");
     }
 }

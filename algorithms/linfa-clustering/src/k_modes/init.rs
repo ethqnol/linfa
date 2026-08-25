@@ -253,12 +253,11 @@ mod tests {
         assert_eq!(c1.dim(), (2, 3));
         assert_eq!(c1, c2, "Cao initialization must be fully deterministic");
 
-        // The first centroid in Cao must be the highest density point ("A", "X", "1" or "B", "Y", "2")
+        // The first centroid in Cao is the highest density point ("A", "X", "2")
         let first_centroid = c1.row(0);
-        assert!(
-            (first_centroid[0] == "A" && first_centroid[1] == "X")
-                || (first_centroid[0] == "B" && first_centroid[1] == "Y")
-        );
+        assert_eq!(first_centroid[0], "A");
+        assert_eq!(first_centroid[1], "X");
+        assert_eq!(first_centroid[2], "2");
     }
 
     #[test]
