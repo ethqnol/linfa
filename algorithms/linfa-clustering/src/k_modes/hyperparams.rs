@@ -158,7 +158,7 @@ impl<T, R: Rng> ParamGuard for KModesParams<T, R> {
 mod tests {
     use super::*;
     use linfa::ParamGuard;
-    use ndarray_rand::rand::{RngCore, SeedableRng};
+    use ndarray_rand::rand::SeedableRng;
     use rand_xoshiro::Xoshiro256Plus;
 
     #[test]
@@ -245,6 +245,7 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn test_serde_hyperparams() {
+        use ndarray_rand::rand::RngCore;
         let params = KModesParams::<String, _>::new_with_rng(3, DummyRng)
             .max_n_iterations(50)
             .n_runs(5)
