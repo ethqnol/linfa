@@ -14,6 +14,7 @@
 //!
 //! Right now `linfa-clustering` provides the following clustering algorithms:
 //! * [K-Means](KMeans)
+//! * [K-Modes](KModes)
 //! * [DBSCAN](Dbscan)
 //! * [Approximated DBSCAN](AppxDbscan) (Currently an alias for DBSCAN, due to its superior
 //!   performance)

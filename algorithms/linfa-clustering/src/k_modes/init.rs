@@ -9,11 +9,12 @@ use std::collections::{HashMap, HashSet};
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate")
 )]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[non_exhaustive]
 /// Specifies the centroid initialization strategy for K-Modes.
 pub enum KModesInit<T> {
     /// Density and dissimilarity-based initialization (Cao et al. [2009]). Default.
+    #[default]
     Cao,
     /// Density-based initialization (Huang [1997, 1998]).
     Huang,
@@ -23,14 +24,8 @@ pub enum KModesInit<T> {
     Precomputed(Array2<T>),
 }
 
-impl<T> Default for KModesInit<T> {
-    fn default() -> Self {
-        Self::Cao
-    }
-}
-
 impl<T: crate::k_modes::EquivalenceTarget> KModesInit<T> {
-    /// Runs the chosen initialization routine
+    /// Executes the configured initialization routine and returns initial centroids.
     pub(crate) fn run<R: Rng>(
         &self,
         n_clusters: usize,
@@ -58,7 +53,19 @@ impl<T: crate::k_modes::EquivalenceTarget> KModesInit<T> {
     }
 }
 
-/// Cao initialization (Cao et al. [2009])
+/// Cao initialization (Cao et al. [2009]): Density and dissimilarity-based selection.
+///
+/// Steps:
+/// 1. Compute marginal attribute density for every point $X_i$:
+///    $$\text{Dens}(X_i) = \sum_{j=1}^{M} \frac{\text{freq}_j(x_{ij})}{N \cdot M}$$
+///    where $\text{freq}_j(v)$ is the frequency of category $v$ across feature $j$,
+///    $N$ is the sample count, and $M$ is the feature count.
+/// 2. Pick the point with maximum density as the first centroid:
+///    $$C_0 = \text{argmax}_{i} \text{Dens}(X_i)$$
+/// 3. For subsequent centroids $k \in \{1, \dots, K-1\}$, choose the unselected point
+///    that maximizes the minimum density-weighted distance to existing centroids:
+///    $$C_k = \text{argmax}_{i \notin C} \left( \min_{c \in C} d(X_i, c) \cdot \text{Dens}(X_i) \right)$$
+///    This balances selecting high-density centers while maintaining spatial dispersion.
 pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     x: ArrayView2<T>,
     n_clusters: usize,
@@ -69,8 +76,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
         "n_clusters cannot exceed number of data points"
     );
 
-    // Calculate point density across categorical features
-    // dens[i] = sum_{j=0}^{n_attrs-1} freq_j(x[i, j]) / (n_points * n_attrs)
+    // Compute marginal attribute density per point
     let mut dens = vec![0.0f64; n_points];
     for iattr in 0..n_attrs {
         let mut freq: HashMap<&T, usize> = HashMap::new();
@@ -85,7 +91,8 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     }
 
     let mut selected_indices = Vec::with_capacity(n_clusters);
-    // Centroid 0 is point with highest density
+
+    // First centroid is the point with the highest density
     let first_idx = dens
         .iter()
         .enumerate()
@@ -94,12 +101,12 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
         .unwrap_or(0);
     selected_indices.push(first_idx);
 
-    // Remaining centroids are selected by the max of (min distance * density) to existing centroids
+    // Subsequent centroids maximize the minimum density-weighted distance to chosen centroids
     for _ in 1..n_clusters {
         let mut best_idx = 0;
         let mut best_score = -1.0f64;
 
-        for ipoint in 0..n_points {
+        for (ipoint, &point_dens) in dens.iter().enumerate() {
             if selected_indices.contains(&ipoint) {
                 continue;
             }
@@ -110,7 +117,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
             for &c_idx in &selected_indices {
                 let c_row = x.row(c_idx);
                 let dist = row.iter().zip(c_row.iter()).filter(|(a, b)| a != b).count() as f64;
-                let score = dist * dens[ipoint];
+                let score = dist * point_dens;
                 if score < min_d {
                     min_d = score;
                 }
@@ -129,7 +136,13 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     })
 }
 
-/// Huang initialization (Huang [1997, 1998])
+/// Huang initialization (Huang [1997, 1998]): Attribute frequency distribution sampling.
+///
+/// Steps:
+/// 1. Construct $K$ tentative synthetic centroids where each attribute $j$ is independently
+///    sampled proportional to its marginal category frequencies in the dataset.
+/// 2. Because synthetic combinations may not represent real observations or could cause empty clusters,
+///    each tentative centroid is mapped to its nearest distinct observation in $X$ via a linear scan.
 pub(crate) fn init_huang<T: crate::k_modes::EquivalenceTarget, R: Rng>(
     x: ArrayView2<T>,
     n_clusters: usize,
@@ -141,13 +154,13 @@ pub(crate) fn init_huang<T: crate::k_modes::EquivalenceTarget, R: Rng>(
         "n_clusters cannot exceed number of data points"
     );
 
-    // Sample tentative centroids using the frequency distribution of attributes
+    // Sample tentative centroids using column marginal distributions
     let mut tentative = Array2::from_shape_fn((n_clusters, n_attrs), |(_, j)| {
         let rand_idx = rng.gen_range(0..n_points);
         x[[rand_idx, j]].clone()
     });
 
-    // Set each centroid to the closest unique point in X
+    // Replace each tentative centroid with the closest unselected observation in X
     let mut selected_indices = HashSet::new();
     for ik in 0..n_clusters {
         let tent_row = tentative.row(ik);
@@ -181,7 +194,9 @@ pub(crate) fn init_huang<T: crate::k_modes::EquivalenceTarget, R: Rng>(
     tentative
 }
 
-/// Random initialization by selecting `n_clusters` random unique data points as centroids.
+/// Random initialization: selects `n_clusters` distinct data points without replacement.
+///
+/// Uses an ordered vector with a hash set to guarantee seed-deterministic output ordering.
 pub(crate) fn random_init<T: Clone, R: Rng>(
     x: ArrayView2<T>,
     n_clusters: usize,
@@ -206,4 +221,166 @@ pub(crate) fn random_init<T: Clone, R: Rng>(
     Array2::from_shape_fn((n_clusters, n_attrs), |(i, j)| {
         x[[selected_indices[i], j]].clone()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::array;
+    use ndarray_rand::rand::SeedableRng;
+    use rand_xoshiro::Xoshiro256Plus;
+
+    #[test]
+    fn autotraits() {
+        fn has_autotraits<T: Send + Sync + Sized + Unpin>() {}
+        has_autotraits::<KModesInit<usize>>();
+    }
+
+    #[test]
+    fn test_init_cao_deterministic() {
+        let data = array![
+            ["A", "X", "1"],
+            ["A", "X", "1"],
+            ["A", "X", "2"],
+            ["B", "Y", "2"],
+            ["B", "Y", "2"],
+            ["C", "Z", "3"]
+        ];
+
+        let c1 = KModesInit::Cao.run(2, data.view(), &mut Xoshiro256Plus::seed_from_u64(42));
+        let c2 = KModesInit::Cao.run(2, data.view(), &mut Xoshiro256Plus::seed_from_u64(999));
+
+        assert_eq!(c1.dim(), (2, 3));
+        assert_eq!(c1, c2, "Cao initialization must be fully deterministic");
+
+        // The first centroid in Cao must be the highest density point ("A", "X", "1" or "B", "Y", "2")
+        let first_centroid = c1.row(0);
+        assert!(
+            (first_centroid[0] == "A" && first_centroid[1] == "X")
+                || (first_centroid[0] == "B" && first_centroid[1] == "Y")
+        );
+    }
+
+    #[test]
+    fn test_init_huang() {
+        let data = array![
+            ["A", "X"],
+            ["A", "X"],
+            ["B", "Y"],
+            ["B", "Y"],
+            ["C", "Z"],
+            ["C", "Z"]
+        ];
+
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+        let centroids = KModesInit::Huang.run(2, data.view(), &mut rng);
+
+        assert_eq!(centroids.dim(), (2, 2));
+        // Verify centroids are drawn from valid data points
+        for row in centroids.rows() {
+            let matches = data.rows().into_iter().any(|d_row| d_row == row);
+            assert!(matches, "Huang centroid must match an existing data observation");
+        }
+    }
+
+    #[test]
+    fn test_init_random_unique_indices() {
+        let data = array![
+            [1, 10],
+            [2, 20],
+            [3, 30],
+            [4, 40],
+            [5, 50]
+        ];
+
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+        let centroids = KModesInit::Random.run(3, data.view(), &mut rng);
+
+        assert_eq!(centroids.dim(), (3, 2));
+        // Verify that 3 distinct rows from data were chosen
+        let r0 = centroids.row(0);
+        let r1 = centroids.row(1);
+        let r2 = centroids.row(2);
+        assert_ne!(r0, r1);
+        assert_ne!(r0, r2);
+        assert_ne!(r1, r2);
+    }
+
+    #[test]
+    fn test_init_precomputed() {
+        let data = array![["A", "X"], ["B", "Y"], ["C", "Z"]];
+        let precomputed = array![["A", "X"], ["C", "Z"]];
+
+        let init = KModesInit::Precomputed(precomputed.clone());
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+        let centroids = init.run(2, data.view(), &mut rng);
+
+        assert_eq!(centroids, precomputed);
+    }
+
+    #[test]
+    #[should_panic(expected = "Precomputed centroids must have shape")]
+    fn test_init_precomputed_wrong_n_clusters() {
+        let data = array![["A", "X"], ["B", "Y"], ["C", "Z"]];
+        let precomputed = array![["A", "X"]];
+
+        let init = KModesInit::Precomputed(precomputed);
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+        init.run(2, data.view(), &mut rng);
+    }
+
+    #[test]
+    #[should_panic(expected = "Precomputed centroids must match feature count")]
+    fn test_init_precomputed_wrong_features() {
+        let data = array![["A", "X"], ["B", "Y"], ["C", "Z"]];
+        let precomputed = array![["A", "X", "extra"], ["B", "Y", "extra"]];
+
+        let init = KModesInit::Precomputed(precomputed);
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+        init.run(2, data.view(), &mut rng);
+    }
+
+    #[test]
+    fn test_init_single_cluster() {
+        let data = array![["A", "X"], ["B", "Y"], ["A", "X"]];
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+
+        let c_cao = KModesInit::Cao.run(1, data.view(), &mut rng);
+        assert_eq!(c_cao.dim(), (1, 2));
+
+        let c_huang = KModesInit::Huang.run(1, data.view(), &mut rng);
+        assert_eq!(c_huang.dim(), (1, 2));
+
+        let c_random = KModesInit::Random.run(1, data.view(), &mut rng);
+        assert_eq!(c_random.dim(), (1, 2));
+    }
+
+    #[test]
+    fn test_init_n_clusters_eq_n_points() {
+        let data = array![["A", "X"], ["B", "Y"], ["C", "Z"]];
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+
+        let c_cao = KModesInit::Cao.run(3, data.view(), &mut rng);
+        assert_eq!(c_cao.dim(), (3, 2));
+
+        let c_huang = KModesInit::Huang.run(3, data.view(), &mut rng);
+        assert_eq!(c_huang.dim(), (3, 2));
+
+        let c_random = KModesInit::Random.run(3, data.view(), &mut rng);
+        assert_eq!(c_random.dim(), (3, 2));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_init() {
+        let init: KModesInit<String> = KModesInit::Cao;
+        let serialized = serde_json::to_string(&init).unwrap();
+        let deserialized: KModesInit<String> = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(init, deserialized);
+
+        let precomputed = KModesInit::Precomputed(array![["A".to_string(), "B".to_string()]]);
+        let serialized_pre = serde_json::to_string(&precomputed).unwrap();
+        let deserialized_pre: KModesInit<String> = serde_json::from_str(&serialized_pre).unwrap();
+        assert_eq!(precomputed, deserialized_pre);
+    }
 }

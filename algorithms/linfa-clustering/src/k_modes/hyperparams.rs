@@ -182,4 +182,80 @@ mod tests {
             Err(KModesParamsError::NRuns)
         );
     }
+
+    #[test]
+    fn test_getters_and_builder_options() {
+        let params = KModesParams::<&str, _>::new(3)
+            .max_n_iterations(200)
+            .n_runs(15)
+            .init_method(KModesInit::Huang)
+            .verbose(true);
+
+        let valid = params.check().unwrap();
+        assert_eq!(valid.n_clusters(), 3);
+        assert_eq!(valid.max_n_iterations(), 200);
+        assert_eq!(valid.n_runs(), 15);
+        assert_eq!(valid.init_method(), &KModesInit::Huang);
+        assert!(valid.verbose());
+    }
+
+    #[test]
+    fn test_custom_rng() {
+        let rng1 = Xoshiro256Plus::seed_from_u64(12345);
+        let params1 = KModesParams::<usize, _>::new_with_rng(4, rng1);
+        let valid1 = params1.check().unwrap();
+        assert_eq!(valid1.n_clusters(), 4);
+
+        let rng2 = Xoshiro256Plus::seed_from_u64(67890);
+        let params2 = KModesParams::<usize, _>::new(2).with_rng(rng2);
+        let valid2 = params2.check().unwrap();
+        assert_eq!(valid2.n_clusters(), 2);
+    }
+
+    #[cfg(feature = "serde")]
+    #[cfg_attr(
+        feature = "serde",
+        derive(Serialize, Deserialize),
+        serde(crate = "serde_crate")
+    )]
+    #[derive(Clone, Debug, PartialEq)]
+    struct DummyRng;
+
+    #[cfg(feature = "serde")]
+    impl ndarray_rand::rand::RngCore for DummyRng {
+        fn next_u32(&mut self) -> u32 {
+            0
+        }
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            dest.fill(0);
+        }
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), ndarray_rand::rand::Error> {
+            dest.fill(0);
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_hyperparams() {
+        let params = KModesParams::<String, _>::new_with_rng(3, DummyRng)
+            .max_n_iterations(50)
+            .n_runs(5)
+            .init_method(KModesInit::Cao)
+            .verbose(false);
+        let valid = params.check().unwrap();
+
+        let serialized = serde_json::to_string(&valid).unwrap();
+        let deserialized: KModesValidParams<String, DummyRng> =
+            serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(valid.n_clusters(), deserialized.n_clusters());
+        assert_eq!(valid.max_n_iterations(), deserialized.max_n_iterations());
+        assert_eq!(valid.n_runs(), deserialized.n_runs());
+        assert_eq!(valid.init_method(), deserialized.init_method());
+        assert_eq!(valid.verbose(), deserialized.verbose());
+    }
 }
