@@ -379,4 +379,27 @@ mod tests {
         let deserialized_pre: KModesInit<String> = serde_json::from_str(&serialized_pre).unwrap();
         assert_eq!(precomputed, deserialized_pre);
     }
+
+    #[test]
+    #[should_panic(expected = "n_clusters cannot exceed number of data points")]
+    fn test_init_cao_n_clusters_exceeds_points() {
+        let data = array![["A", "1"]];
+        init_cao(data.view(), 5);
+    }
+
+    #[test]
+    #[should_panic(expected = "n_clusters cannot exceed number of data points")]
+    fn test_init_huang_n_clusters_exceeds_points() {
+        let data = array![["A", "1"]];
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+        init_huang(data.view(), 5, &mut rng);
+    }
+
+    #[test]
+    #[should_panic(expected = "n_clusters cannot exceed number of data points")]
+    fn test_init_random_n_clusters_exceeds_points() {
+        let data = array![["A", "1"]];
+        let mut rng = Xoshiro256Plus::seed_from_u64(42);
+        random_init(data.view(), 5, &mut rng);
+    }
 }

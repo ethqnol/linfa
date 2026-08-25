@@ -954,4 +954,15 @@ mod tests {
 
         assert_eq!(model.modes()[[0, 0]], "Y");
     }
+
+    #[test]
+    #[should_panic(expected = "Number of observations must match memberships length")]
+    fn test_kmodes_predict_inplace_mismatched_length() {
+        use linfa::traits::PredictInplace;
+        let data = array![["A", "1"], ["B", "2"]];
+        let dataset = DatasetBase::from(data.clone());
+        let model = KModes::params(2).fit(&dataset).unwrap();
+        let mut wrong_memberships = ndarray::Array1::zeros(10);
+        model.predict_inplace(&data, &mut wrong_memberships);
+    }
 }
