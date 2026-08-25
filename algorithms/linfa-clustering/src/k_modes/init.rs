@@ -279,19 +279,16 @@ mod tests {
         // Verify centroids are drawn from valid data points
         for row in centroids.rows() {
             let matches = data.rows().into_iter().any(|d_row| d_row == row);
-            assert!(matches, "Huang centroid must match an existing data observation");
+            assert!(
+                matches,
+                "Huang centroid must match an existing data observation"
+            );
         }
     }
 
     #[test]
     fn test_init_random_unique_indices() {
-        let data = array![
-            [1, 10],
-            [2, 20],
-            [3, 30],
-            [4, 40],
-            [5, 50]
-        ];
+        let data = array![[1, 10], [2, 20], [3, 30], [4, 40], [5, 50]];
 
         let mut rng = Xoshiro256Plus::seed_from_u64(42);
         let centroids = KModesInit::Random.run(3, data.view(), &mut rng);

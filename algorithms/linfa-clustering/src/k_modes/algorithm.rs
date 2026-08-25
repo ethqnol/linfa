@@ -533,12 +533,7 @@ mod tests {
 
     #[test]
     fn test_kmodes_single_cluster() {
-        let data = array![
-            ["A", "X"],
-            ["A", "X"],
-            ["A", "Y"],
-            ["B", "X"]
-        ];
+        let data = array![["A", "X"], ["A", "X"], ["A", "Y"], ["B", "X"]];
         let dataset = DatasetBase::from(data);
         let model = KModes::params(1).fit(&dataset).unwrap();
 
@@ -609,7 +604,10 @@ mod tests {
 
         let preds = model.predict(&dataset);
         assert_eq!(preds.slice(ndarray::s![0..10]).to_vec(), vec![preds[0]; 10]);
-        assert_eq!(preds.slice(ndarray::s![10..20]).to_vec(), vec![preds[10]; 10]);
+        assert_eq!(
+            preds.slice(ndarray::s![10..20]).to_vec(),
+            vec![preds[10]; 10]
+        );
         assert_ne!(preds[0], preds[10]);
     }
 
@@ -624,10 +622,7 @@ mod tests {
             ["C", "2"]
         ];
         let dataset = DatasetBase::from(data);
-        let model = KModes::params(3)
-            .max_n_iterations(1)
-            .fit(&dataset)
-            .unwrap();
+        let model = KModes::params(3).max_n_iterations(1).fit(&dataset).unwrap();
 
         assert_eq!(model.modes().dim(), (3, 2));
     }
@@ -689,12 +684,7 @@ mod tests {
 
     #[test]
     fn test_kmodes_predict_unseen_categories() {
-        let data = array![
-            ["A", "X"],
-            ["A", "X"],
-            ["B", "Y"],
-            ["B", "Y"]
-        ];
+        let data = array![["A", "X"], ["A", "X"], ["B", "Y"], ["B", "Y"]];
         let dataset = DatasetBase::from(data);
         let model = KModes::params(2).fit(&dataset).unwrap();
 
@@ -718,12 +708,7 @@ mod tests {
         assert_eq!(model.modes().dim(), (2, 2));
         assert_eq!(model.cost(), 0);
 
-        let u8_data = array![
-            [1u8, 2u8],
-            [1u8, 2u8],
-            [3u8, 4u8],
-            [3u8, 4u8]
-        ];
+        let u8_data = array![[1u8, 2u8], [1u8, 2u8], [3u8, 4u8], [3u8, 4u8]];
         let u8_dataset = DatasetBase::from(u8_data);
         let u8_model = KModes::params(2).fit(&u8_dataset).unwrap();
         assert_eq!(u8_model.modes().dim(), (2, 2));
@@ -743,23 +728,13 @@ mod tests {
 
     #[test]
     fn test_kmodes_types_char_and_bool() {
-        let char_data = array![
-            ['a', 'x'],
-            ['a', 'x'],
-            ['b', 'y'],
-            ['b', 'y']
-        ];
+        let char_data = array![['a', 'x'], ['a', 'x'], ['b', 'y'], ['b', 'y']];
         let char_dataset = DatasetBase::from(char_data);
         let char_model = KModes::params(2).fit(&char_dataset).unwrap();
         assert_eq!(char_model.modes().dim(), (2, 2));
         assert_eq!(char_model.cost(), 0);
 
-        let bool_data = array![
-            [true, false],
-            [true, false],
-            [false, true],
-            [false, true]
-        ];
+        let bool_data = array![[true, false], [true, false], [false, true], [false, true]];
         let bool_dataset = DatasetBase::from(bool_data);
         let bool_model = KModes::params(2).fit(&bool_dataset).unwrap();
         assert_eq!(bool_model.modes().dim(), (2, 2));

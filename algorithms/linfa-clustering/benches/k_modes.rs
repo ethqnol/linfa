@@ -17,9 +17,7 @@ fn generate_synthetic_categorical(
     n_categories: usize,
     rng: &mut Xoshiro256Plus,
 ) -> Array2<usize> {
-    Array2::from_shape_fn((n_samples, n_features), |_| {
-        rng.gen_range(0..n_categories)
-    })
+    Array2::from_shape_fn((n_samples, n_features), |_| rng.gen_range(0..n_categories))
 }
 
 fn k_modes_bench(c: &mut Criterion) {
@@ -35,7 +33,8 @@ fn k_modes_bench(c: &mut Criterion) {
 
     for &n_features in &feature_dims {
         for &n_samples in &sample_sizes {
-            let raw_data = generate_synthetic_categorical(n_samples, n_features, n_categories, &mut rng);
+            let raw_data =
+                generate_synthetic_categorical(n_samples, n_features, n_categories, &mut rng);
             let dataset = DatasetBase::from(raw_data);
 
             // Benchmark Cao initialization
@@ -103,4 +102,3 @@ criterion_group! {
 criterion_group!(benches, k_modes_bench);
 
 criterion_main!(benches);
-
