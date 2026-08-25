@@ -16,7 +16,7 @@ use serde_crate::{Deserialize, Serialize};
     serde(crate = "serde_crate")
 )]
 #[derive(Clone, Debug, PartialEq, Eq)]
-/// K-Modes clustering model for categorical data (Huang [1998]).
+/// K-Modes clustering model for categorical data (Huang \[1998\]).
 ///
 /// Partitions $N$ categorical observations into $K$ clusters by finding a mode vector $Q_l$
 /// for each cluster $l \in \{0, \dots, K-1\}$ that minimizes the sum of matching dissimilarities:

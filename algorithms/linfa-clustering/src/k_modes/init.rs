@@ -13,10 +13,10 @@ use std::collections::{HashMap, HashSet};
 #[non_exhaustive]
 /// Specifies the centroid initialization strategy for K-Modes.
 pub enum KModesInit<T> {
-    /// Density and dissimilarity-based initialization (Cao et al. [2009]). Default.
+    /// Density and dissimilarity-based initialization (Cao et al. \[2009\]). Default.
     #[default]
     Cao,
-    /// Density-based initialization (Huang [1997, 1998]).
+    /// Density-based initialization (Huang \[1997, 1998\]).
     Huang,
     /// Randomly selects `n_clusters` unique observations from the dataset.
     Random,
@@ -53,7 +53,7 @@ impl<T: crate::k_modes::EquivalenceTarget> KModesInit<T> {
     }
 }
 
-/// Cao initialization (Cao et al. [2009]): Density and dissimilarity-based selection.
+/// Cao initialization (Cao et al. \[2009\]): Density and dissimilarity-based selection.
 ///
 /// Steps:
 /// 1. Compute marginal attribute density for every point $X_i$:
@@ -136,7 +136,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     })
 }
 
-/// Huang initialization (Huang [1997, 1998]): Attribute frequency distribution sampling.
+/// Huang initialization (Huang \[1997, 1998\]): Attribute frequency distribution sampling.
 ///
 /// Steps:
 /// 1. Construct $K$ tentative synthetic centroids where each attribute $j$ is independently
