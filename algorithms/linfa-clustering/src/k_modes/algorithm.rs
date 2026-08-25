@@ -423,11 +423,7 @@ impl<T: EquivalenceTarget, D: Data<Elem = T>> PredictInplace<ArrayBase<D, Ix2>, 
 {
     /// Predicts closest cluster indices for a 2D batch of observations.
     fn predict_inplace(&self, observations: &ArrayBase<D, Ix2>, memberships: &mut Array1<usize>) {
-        assert_eq!(
-            observations.nrows(),
-            memberships.len(),
-            "Number of observations must match memberships length"
-        );
+        assert_eq!(observations.nrows(), memberships.len());
 
         for (i, obs) in observations.rows().into_iter().enumerate() {
             memberships[i] = closest_centroid(self.modes.view(), obs).0;
@@ -956,7 +952,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Number of observations must match memberships length")]
+    #[should_panic]
     fn test_kmodes_predict_inplace_mismatched_length() {
         use linfa::traits::PredictInplace;
         let data = array![["A", "1"], ["B", "2"]];

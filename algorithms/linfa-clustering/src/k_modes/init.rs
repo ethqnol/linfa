@@ -37,16 +37,8 @@ impl<T: crate::k_modes::EquivalenceTarget> KModesInit<T> {
             Self::Huang => init_huang(observations, n_clusters, rng),
             Self::Random => random_init(observations, n_clusters, rng),
             Self::Precomputed(centroids) => {
-                assert_eq!(
-                    centroids.nrows(),
-                    n_clusters,
-                    "Precomputed centroids must have shape (n_clusters, n_features)"
-                );
-                assert_eq!(
-                    centroids.ncols(),
-                    observations.ncols(),
-                    "Precomputed centroids must match feature count"
-                );
+                assert_eq!(centroids.nrows(), n_clusters);
+                assert_eq!(centroids.ncols(), observations.ncols());
                 centroids.clone()
             }
         }
@@ -71,10 +63,7 @@ pub(crate) fn init_cao<T: crate::k_modes::EquivalenceTarget>(
     n_clusters: usize,
 ) -> Array2<T> {
     let (n_points, n_attrs) = x.dim();
-    assert!(
-        n_clusters <= n_points,
-        "n_clusters cannot exceed number of data points"
-    );
+    assert!(n_clusters <= n_points);
 
     // Compute marginal attribute density per point
     let mut dens = vec![0.0f64; n_points];
@@ -149,10 +138,7 @@ pub(crate) fn init_huang<T: crate::k_modes::EquivalenceTarget, R: Rng>(
     rng: &mut R,
 ) -> Array2<T> {
     let (n_points, n_attrs) = x.dim();
-    assert!(
-        n_clusters <= n_points,
-        "n_clusters cannot exceed number of data points"
-    );
+    assert!(n_clusters <= n_points);
 
     // Sample tentative centroids using column marginal distributions
     let mut tentative = Array2::from_shape_fn((n_clusters, n_attrs), |(_, j)| {
@@ -203,10 +189,7 @@ pub(crate) fn random_init<T: Clone, R: Rng>(
     rng: &mut R,
 ) -> Array2<T> {
     let (n_points, n_attrs) = x.dim();
-    assert!(
-        n_clusters <= n_points,
-        "n_clusters cannot exceed number of data points"
-    );
+    assert!(n_clusters <= n_points);
 
     let mut selected_indices = Vec::with_capacity(n_clusters);
     let mut seen = HashSet::with_capacity(n_clusters);
@@ -315,25 +298,21 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Precomputed centroids must have shape")]
+    #[should_panic]
     fn test_init_precomputed_wrong_n_clusters() {
         let data = array![["A", "X"], ["B", "Y"], ["C", "Z"]];
         let precomputed = array![["A", "X"]];
-
-        let init = KModesInit::Precomputed(precomputed);
         let mut rng = Xoshiro256Plus::seed_from_u64(42);
-        init.run(2, data.view(), &mut rng);
+        KModesInit::Precomputed(precomputed).run(2, data.view(), &mut rng);
     }
 
     #[test]
-    #[should_panic(expected = "Precomputed centroids must match feature count")]
+    #[should_panic]
     fn test_init_precomputed_wrong_features() {
         let data = array![["A", "X"], ["B", "Y"], ["C", "Z"]];
         let precomputed = array![["A", "X", "extra"], ["B", "Y", "extra"]];
-
-        let init = KModesInit::Precomputed(precomputed);
         let mut rng = Xoshiro256Plus::seed_from_u64(42);
-        init.run(2, data.view(), &mut rng);
+        KModesInit::Precomputed(precomputed).run(2, data.view(), &mut rng);
     }
 
     #[test]
@@ -381,14 +360,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "n_clusters cannot exceed number of data points")]
+    #[should_panic]
     fn test_init_cao_n_clusters_exceeds_points() {
         let data = array![["A", "1"]];
         init_cao(data.view(), 5);
     }
 
     #[test]
-    #[should_panic(expected = "n_clusters cannot exceed number of data points")]
+    #[should_panic]
     fn test_init_huang_n_clusters_exceeds_points() {
         let data = array![["A", "1"]];
         let mut rng = Xoshiro256Plus::seed_from_u64(42);
@@ -396,7 +375,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "n_clusters cannot exceed number of data points")]
+    #[should_panic]
     fn test_init_random_n_clusters_exceeds_points() {
         let data = array![["A", "1"]];
         let mut rng = Xoshiro256Plus::seed_from_u64(42);
